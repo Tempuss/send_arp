@@ -87,7 +87,6 @@ void getMacAddress(char *interface, u_char *uc_Mac)
 
        sprintf((char *)uc_Mac,(const char *)"%.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n" , mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-
 }
 /**
  * @brief printHex
@@ -184,12 +183,7 @@ void setEther(struct libnet_ethernet_hdr *ptr, uint8_t target_mac[6], vector<str
 {
 
     //Set Target MAC
-    ptr->ether_dhost[0] = target_mac[0];
-    ptr->ether_dhost[1] = target_mac[1];
-    ptr->ether_dhost[2] = target_mac[2];
-    ptr->ether_dhost[3] = target_mac[3];
-    ptr->ether_dhost[4] = target_mac[4];
-    ptr->ether_dhost[5] = target_mac[5];
+    memcpy(ptr->ether_dhost, target_mac, 6);
 
     //Set Sender MAC
     ptr->ether_shost[0] = stoi(sender_mac[0].c_str(),0,16);
@@ -206,7 +200,6 @@ int main(int argc, char **argv) {
     pcap_t *fp;
     u_char packet[42];
     libnet_ethernet_hdr eth_header = {};
-    libnet_ipv4_hdr* ip_header;
     libnet_arp_hdr arp_header = {};
     arp_format arp_info = {};
 
@@ -218,7 +211,6 @@ int main(int argc, char **argv) {
     char *my_ip = getIpAddress(interface);
     unsigned char mac[32]={0};
 
-    //cout<<interface<<endl;
     getMacAddress(interface,mac);
     vector<string> split_mac = stringSplit(mac, ':');
 
@@ -254,16 +246,7 @@ int main(int argc, char **argv) {
 
     //setArpInfo(&arp_info,vect, my_ip, split_mac, target_ip);
 
-    arp_header.ar_hrd = 0x0100;
-    arp_header.ar_hln = 0x06;
-    arp_header.ar_pro = 0x0008;
-    arp_header.ar_pln = 0x04;
-
-    arp_header.ar_op = 0x0100;
-
-
     arp_info.send_ip = inet_addr(my_ip);
-
     //Set Sender MAC
     arp_info.send_mac[0] = stoi(split_mac[0].c_str(),0,16);
     arp_info.send_mac[1] = stoi(split_mac[1].c_str(),0,16);
@@ -313,23 +296,15 @@ int main(int argc, char **argv) {
         //arp check
         if (type == 0x0608)
         {
-            cout<<"arp"<<endl;
             //Get IP Header From Packet
             recv_arp_info = (struct libnet_arp_hdr*)(read_packet+sizeof(struct libnet_ethernet_hdr));
             recv_arp_data = (struct arp_format*)(read_packet+sizeof(struct libnet_ethernet_hdr)+sizeof(struct libnet_arp_hdr));
 
-            printf("%02X:%02X\n", recv_arp_data->send_mac[0], recv_arp_data->send_mac[1]);
-            //printHex(sizeof(struct arp_format), reinterpret_cast<const u_char*>(recv_arp_data));
-            //cout<<sizeof(recv_arp_data)<<endl;
-            //cout<<std::hex<<recv_arp_data->target_mac<<endl;
-            //printHex(header->caplen, read_packet);
-            //printHex(sizeof(struct arp_format), read_packet+sizeof(struct libnet_ethernet_hdr)+sizeof(struct libnet_arp_hdr));
-            //cout<<inet_ntop(recv_arp_data->send_ip)<<endl;
-            //printf("%02X:%02X:%02X", recv_arp_data->send_mac[0], recv_arp_data->send_mac[1], recv_arp_data->send_mac[2]);
-            //cout<<recv_arp_data<<endl;
-            //printHex(sizeof(recv_arp_data), recv_arp_data);
-            //cout<<std::hex<<recv_arp_info<<endl;
+            uint8_t tmp2[6] = {0};
+            memcpy(tmp2, recv_arp_data->send_mac, sizeof(recv_arp_data->send_mac));
+          	setEther(&eth_header, tmp2, split_mac);
 
+    
             //Set Target MAC
             eth_header.ether_dhost[0] = recv_arp_data->send_mac[0];
             eth_header.ether_dhost[1] = recv_arp_data->send_mac[1];
@@ -337,17 +312,6 @@ int main(int argc, char **argv) {
             eth_header.ether_dhost[3] = recv_arp_data->send_mac[3];
             eth_header.ether_dhost[4] = recv_arp_data->send_mac[4];
             eth_header.ether_dhost[5] = recv_arp_data->send_mac[5];
-
-            /*
-            eth_header.ether_dhost[1] = 0xff;
-            eth_header.ether_dhost[2] = 0xff;
-            eth_header.ether_dhost[3] = 0xff;
-            eth_header.ether_dhost[4] = 0xff;
-            eth_header.ether_dhost[5] = 0xff;
-            */
-
-            //uint8_t tmp_target_mac[6] = {recv_arp_data->, 0xff, 0xff, 0xff, 0xff, 0xff};
-            //setEther(&eth_header, tmp_target_mac, split_mac);
 
             //Set Sender MAC
             eth_header.ether_shost[0] = stoi(split_mac[0].c_str(),0,16);
@@ -358,17 +322,9 @@ int main(int argc, char **argv) {
             eth_header.ether_shost[5] = stoi(split_mac[5].c_str(),0,16);
             eth_header.ether_type = 0x0608;
 
-            //Set ARP Header
-            arp_header.ar_hrd = 0x0100;
-            arp_header.ar_hln = 0x06;
-            arp_header.ar_pro = 0x0008;
-            arp_header.ar_pln = 0x04;
-
-            //Set Opcode
-            arp_header.ar_op = 0x0200;
+            setArpType(&arp_header, 0x0200);
 
             //Set Sender IP & MAC
-            //arp_info.send_ip = inet_addr("192.168.56.1");
             arp_info.send_ip = inet_addr(sender_ip);
 
             //Set Sender MAC
