@@ -45,15 +45,15 @@
     - MAC : 52:54:00:12:35:00
     
   
-  #### 순서
-  1. 네트워크 전체에 BroadCast로 10.0.2.6에 ARP Request를 날린다
+  ### 순서
+  #### 1. 네트워크 전체에 BroadCast로 10.0.2.6에 ARP Request를 날린다
   ![normal_arp_request](https://user-images.githubusercontent.com/13353498/62453653-b9721f00-b7ad-11e9-97f1-0b66c8a5e1dc.PNG)
   
-  2. ARP Reply로 받은 packet에서 10.0.2.6에 대한 MAC Address를 가져온다
+  #### 2. ARP Reply로 받은 packet에서 10.0.2.6에 대한 MAC Address를 가져온다
   ![normal_arp_reply](https://user-images.githubusercontent.com/13353498/62453663-becf6980-b7ad-11e9-98fd-ff12f8c2a751.PNG)
   
-  3. 10.0.2.6에게 Sender Protocol Address를 10.0.2.1을 넣고 Sender Hardware Address에 공격자의 MAC Address를 넣고 ARP Reply를 날린다
+  #### 3. 10.0.2.6에게 Sender Protocol Address를 10.0.2.1을 넣고 Sender Hardware Address에 공격자의 MAC Address를 넣고 ARP Reply를 날린다
   ![mal_arp_reply](https://user-images.githubusercontent.com/13353498/62453665-becf6980-b7ad-11e9-8e8a-80f76954929c.PNG)
   
-  4. ARP Reply를 받은 Sender PC는 ARP 테이블을 업데이트 하여 공격자의 MAC Address를 GateWay로 착각하게 된다
+  #### 4. ARP Reply를 받은 Sender PC는 ARP 테이블을 업데이트 하여 공격자의 MAC Address를 GateWay로 착각하게 된다
   ![after_attack](https://user-images.githubusercontent.com/13353498/62453710-d9094780-b7ad-11e9-9514-73fc7856f8ea.PNG)
