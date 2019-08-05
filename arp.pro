@@ -16,8 +16,8 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-        main.cpp \
-        structure.cpp
+        src/main.cpp \
+        src/structure.cpp
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -25,7 +25,10 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
-    define.h \
     libnet/libnet-headers.h \
     libnet/libnet-macros.h \
-    libnet/libnet-types.h
+    libnet/libnet-types.h \
+    src/define.h \
+    src/libnet/libnet-headers.h \
+    src/libnet/libnet-macros.h \
+    src/libnet/libnet-types.h

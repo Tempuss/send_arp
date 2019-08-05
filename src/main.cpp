@@ -12,11 +12,11 @@
 #include <sstream>
 #include <sys/types.h>
 #include <ifaddrs.h>
-#include <libnet/libnet-macros.h>
-#include <libnet/libnet-types.h>
-#include <libnet/libnet-headers.h>
-#include <structure.cpp>
-#include "define.h"
+#include <src/libnet/libnet-macros.h>
+#include <src/libnet/libnet-types.h>
+#include <src/libnet/libnet-headers.h>
+#include "src/define.h"
+#include "structure.cpp"
 #define PCAP_OPENFLAG_PROMISCUOUS   1
 
 using namespace std;
