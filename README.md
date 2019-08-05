@@ -22,7 +22,8 @@
 ## ARP Spoofing
 
   ### Network Structure 
-  ![image](https://user-images.githubusercontent.com/13353498/62436635-346e1200-b77b-11e9-8d84-fffb42b17ed3.png)
+  ![image](https://user-images.githubusercontent.com/13353498/62453502-69935800-b7ad-11e9-8849-10b13efd2fc8.png)
+
 
   ### 시나리오
   * 공격자는 GateWay, Sender의 IP를 알고 있다
@@ -32,23 +33,27 @@
     > * Target : GateWay
   
   * Attacker
-    - IP : 192.168.43.139
-    - MAC : 04-EA-56-20-BC-F5
+    - IP : 10.0.2.4
+    - MAC :08:00:27:6d:8f:be
     
   * Sender
-    - IP : 192.168.43.234
-    - MAC : 04-EA-56-20-E2-75
-    
+    - IP : 10.0.2.6
+    - MAC : 08:00:27:54:8f:b5
+      
   * Target
-    - IP : 192.168.43.1
-    - MAC : 66-7b-ce-98-62-e8
+    - IP : 10.0.2.1
+    - MAC : 52:54:00:12:35:00
+    
   
   #### 순서
-  1. 네트워크 전체에 BroadCast로 43.234에 ARP Request를 날린다
+  1. 네트워크 전체에 BroadCast로 10.0.2.6에 ARP Request를 날린다
+  ![normal_arp_request](https://user-images.githubusercontent.com/13353498/62453653-b9721f00-b7ad-11e9-97f1-0b66c8a5e1dc.PNG)
   
-  2. ARP Reply로 받은 packet에서 43.234에 대한 MAC Address를 가져온다
+  2. ARP Reply로 받은 packet에서 10.0.2.6에 대한 MAC Address를 가져온다
+  ![normal_arp_reply](https://user-images.githubusercontent.com/13353498/62453663-becf6980-b7ad-11e9-98fd-ff12f8c2a751.PNG)
   
-  3. 43.234에게 Sender Protocol Address를 43.1을 넣고 Sender Hardware Address에 공격자의 MAC Address를 넣고 ARP Reply를 날린다
+  3. 10.0.2.6에게 Sender Protocol Address를 10.0.2.1을 넣고 Sender Hardware Address에 공격자의 MAC Address를 넣고 ARP Reply를 날린다
+  ![mal_arp_reply](https://user-images.githubusercontent.com/13353498/62453665-becf6980-b7ad-11e9-8e8a-80f76954929c.PNG)
   
-  4. ARP Reply를 받은 Sender PC는 ARP 테이블을 업데이트 하여 공격자의 MAC Address를 GateWay로 착각하게 되낟
-  
+  4. ARP Reply를 받은 Sender PC는 ARP 테이블을 업데이트 하여 공격자의 MAC Address를 GateWay로 착각하게 된다
+  ![after_attack](https://user-images.githubusercontent.com/13353498/62453710-d9094780-b7ad-11e9-9514-73fc7856f8ea.PNG)
