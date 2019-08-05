@@ -20,3 +20,35 @@
   > * Destination Protocol Address (TPA) : 목적지 IP 주소 세팅
   
 ## ARP Spoofing
+
+  ### Network Structure 
+  ![image](https://user-images.githubusercontent.com/13353498/62436635-346e1200-b77b-11e9-8d84-fffb42b17ed3.png)
+
+  ### 시나리오
+  * 공격자는 GateWay, Sender의 IP를 알고 있다
+  * 단어 설명 
+    > * Attacker : 본인 PC(공격자)
+    > * Sender : 피해자 PC(피해자) aka Destination
+    > * Target : GateWay
+  
+  * Attacker
+    - IP : 192.168.43.139
+    - MAC : 04-EA-56-20-BC-F5
+    
+  * Sender
+    - IP : 192.168.43.234
+    - MAC : 04-EA-56-20-E2-75
+    
+  * Target
+    - IP : 192.168.43.1
+    - MAC : 66-7b-ce-98-62-e8
+  
+  #### 순서
+  1. 네트워크 전체에 BroadCast로 43.234에 ARP Request를 날린다
+  
+  2. ARP Reply로 받은 packet에서 43.234에 대한 MAC Address를 가져온다
+  
+  3. 43.234에게 Sender Protocol Address를 43.1을 넣고 Sender Hardware Address에 공격자의 MAC Address를 넣고 ARP Reply를 날린다
+  
+  4. ARP Reply를 받은 Sender PC는 ARP 테이블을 업데이트 하여 공격자의 MAC Address를 GateWay로 착각하게 되낟
+  
